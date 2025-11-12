@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const INITIAL_LIST = {
   id: "list-1",
@@ -29,6 +30,13 @@ const validateName = (value, original) => {
 };
 
 export default function ShoppingListDetail() {
+  const navigate = useNavigate();
+
+  const goBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/shopping-lists");
+  };
+
   const [list, setList] = useState(INITIAL_LIST);
   const [showResolved, setShowResolved] = useState(true);
   const [newItemText, setNewItemText] = useState("");
@@ -75,14 +83,14 @@ export default function ShoppingListDetail() {
 
   const saveRename = () => {
     if (!isOwner) return;
-    if (nameError) return; 
+    if (nameError) return;
     const name = tempName.trim();
     setList((prev) => ({ ...prev, name }));
     setEditingName(false);
     setNameError("");
   };
 
-  // Members 
+  // Members
   const addMember = () => {
     if (!isOwner) return;
 
@@ -97,9 +105,9 @@ export default function ShoppingListDetail() {
     }));
     setNewMemberEmail("");
 
-  setSuccessMessage("Member added successfully!");
-  setTimeout(() => setSuccessMessage(""), 2500);
-};
+    setSuccessMessage("Member added successfully!");
+    setTimeout(() => setSuccessMessage(""), 2500);
+  };
 
   const removeMember = (id) => {
     if (!isOwner || id === list.ownerId) return;
@@ -118,7 +126,7 @@ export default function ShoppingListDetail() {
     <div className="page">
       {/* Header */}
       <header className="topbar">
-        <button className="back" onClick={() => alert("Back (demo)")}>
+        <button className="back" onClick={goBack}>
           ← Back
         </button>
 
@@ -138,7 +146,7 @@ export default function ShoppingListDetail() {
               <button
                 className="btn primary"
                 onClick={saveRename}
-                disabled={!isOwner || !!nameError} 
+                disabled={!isOwner || !!nameError}
               >
                 Save
               </button>
@@ -241,17 +249,20 @@ export default function ShoppingListDetail() {
               ＋
             </button>
           </div>
-          
+
           {successMessage && (
-  <div style={{
-    color: "green",
-    fontSize: "14px",
-    marginTop: "6px",
-    marginBottom: "8px"
-  }}>
-    {successMessage}
-  </div>
-)}
+            <div
+              style={{
+                color: "green",
+                fontSize: "14px",
+                marginTop: "6px",
+                marginBottom: "8px"
+              }}
+            >
+              {successMessage}
+            </div>
+          )}
+
           <div className="subhead">
             <span>Owner</span>
           </div>
