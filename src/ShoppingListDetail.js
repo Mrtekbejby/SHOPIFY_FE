@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
-const INITIAL_LIST = {
+const TEMPLATE_LIST = {
   id: "list-1",
   name: "Weekly groceries",
   archived: false,
@@ -20,6 +20,40 @@ const INITIAL_LIST = {
   members: []
 };
 
+const ITEMS_TEMPLATES = {
+  "Weekly groceries": [
+    { id: "wg-1", text: "bread", completed: false },
+    { id: "wg-2", text: "ham", completed: true },
+    { id: "wg-3", text: "milk", completed: false },
+    { id: "wg-4", text: "pasta", completed: true },
+    { id: "wg-5", text: "water", completed: false },
+    { id: "wg-6", text: "pork chops", completed: true },
+    { id: "wg-7", text: "eggs", completed: true },
+    { id: "wg-8", text: "apple", completed: true },
+    { id: "wg-9", text: "garlic", completed: false }
+  ],
+  "Office snacks": [
+    { id: "sn-1", text: "chips", completed: false },
+    { id: "sn-2", text: "cookies", completed: false },
+    { id: "sn-3", text: "nuts", completed: false },
+    { id: "sn-4", text: "chocolate bar", completed: false },
+    { id: "sn-5", text: "cola", completed: false },
+    { id: "sn-6", text: "sparkling water", completed: false }
+  ],
+  "Camping trip food list": [
+    { id: "ct-1", text: "sausages", completed: false },
+    { id: "ct-2", text: "marshmallows", completed: false },
+    { id: "ct-3", text: "bread rolls", completed: false }
+  ],
+  "Birthday party supplies": [
+    { id: "bp-1", text: "balloons", completed: true },
+    { id: "bp-2", text: "cake", completed: false },
+    { id: "bp-3", text: "napkins", completed: true },
+    { id: "bp-4", text: "paper plates", completed: false },
+    { id: "bp-5", text: "cups", completed: false }
+  ]
+};
+
 const CURRENT_USER_ID = "u1";
 
 const validateName = (value, original) => {
@@ -29,20 +63,68 @@ const validateName = (value, original) => {
   return "";
 };
 
+function buildInitialItems(passedList) {
+  if (Array.isArray(passedList.items)) {
+    const hasRealText = passedList.items.some(
+      (it) => it && typeof it === "object" && typeof it.text === "string"
+    );
+    if (hasRealText) {
+      return passedList.items.map((it, index) => ({
+        id: it.id || it.itemId || `${passedList.id}-item-${index + 1}`,
+        text: it.text ?? `Item ${index + 1}`,
+        completed: !!it.completed
+      }));
+    }
+  }
+
+  const count = Array.isArray(passedList.items)
+    ? passedList.items.length
+    : 0;
+
+  const template = ITEMS_TEMPLATES[passedList.name];
+  if (template) {
+    return template.slice(0, count);
+  }
+
+  if (count > 0) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `${passedList.id}-item-${i + 1}`,
+      text: `Item ${i + 1}`,
+      completed: false
+    }));
+  }
+
+  return [];
+}
+
 export default function ShoppingListDetail() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const goBack = () => {
-    if (window.history.length > 1) navigate(-1);
-    else navigate("/shopping-lists");
-  };
+  const passedList = location.state?.list || null;
 
-  const [list, setList] = useState(INITIAL_LIST);
+  const initialList = passedList
+    ? {
+        ...TEMPLATE_LIST,
+        id: passedList.id,
+        name: passedList.name,
+        archived: passedList.archived ?? false,
+        ownerId: passedList.ownerId ?? TEMPLATE_LIST.ownerId,
+        items: buildInitialItems(passedList),
+        members: (passedList.members || []).map((email, index) => ({
+          id: "u" + index,
+          name: email.split("@")[0],
+          email
+        }))
+      }
+    : TEMPLATE_LIST;
+
+  const [list, setList] = useState(initialList);
   const [showResolved, setShowResolved] = useState(true);
   const [newItemText, setNewItemText] = useState("");
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [editingName, setEditingName] = useState(false);
-  const [tempName, setTempName] = useState(list.name);
+  const [tempName, setTempName] = useState(initialList.name);
   const [nameError, setNameError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -51,27 +133,43 @@ export default function ShoppingListDetail() {
   const canLeave = !isOwner && isMember;
 
   const visibleItems = useMemo(() => {
-    if (!showResolved) return list.items.filter((it) => !it.completed);
-    return [...list.items].sort((a, b) => Number(a.completed) - Number(b.completed));
+    const itemsArray = Array.isArray(list.items) ? list.items : [];
+    if (!showResolved) return itemsArray.filter((it) => !it.completed);
+    return [...itemsArray].sort(
+      (a, b) => Number(a.completed) - Number(b.completed)
+    );
   }, [list.items, showResolved]);
+
+  const goBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/shopping-lists");
+  };
 
   // Items
   const addItem = () => {
     const text = newItemText.trim();
     if (!text) return;
     const id = "i" + Date.now();
-    setList((prev) => ({ ...prev, items: [...prev.items, { id, text, completed: false }] }));
+    setList((prev) => ({
+      ...prev,
+      items: [...(prev.items || []), { id, text, completed: false }]
+    }));
     setNewItemText("");
   };
 
   const toggleItem = (id) =>
     setList((prev) => ({
       ...prev,
-      items: prev.items.map((it) => (it.id === id ? { ...it, completed: !it.completed } : it))
+      items: (prev.items || []).map((it) =>
+        it.id === id ? { ...it, completed: !it.completed } : it
+      )
     }));
 
   const removeItem = (id) =>
-    setList((prev) => ({ ...prev, items: prev.items.filter((it) => it.id !== id) }));
+    setList((prev) => ({
+      ...prev,
+      items: (prev.items || []).filter((it) => it.id !== id)
+    }));
 
   // Rename
   const startRename = () => {
@@ -96,7 +194,8 @@ export default function ShoppingListDetail() {
 
     const email = newMemberEmail.trim();
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) return;
-    if (list.members.some((m) => m.email.toLowerCase() === email.toLowerCase())) return;
+    if (list.members.some((m) => m.email.toLowerCase() === email.toLowerCase()))
+      return;
 
     const id = "u" + Date.now();
     setList((prev) => ({
@@ -111,7 +210,10 @@ export default function ShoppingListDetail() {
 
   const removeMember = (id) => {
     if (!isOwner || id === list.ownerId) return;
-    setList((prev) => ({ ...prev, members: prev.members.filter((m) => m.id !== id) }));
+    setList((prev) => ({
+      ...prev,
+      members: prev.members.filter((m) => m.id !== id)
+    }));
   };
 
   const leaveList = () => {
@@ -161,7 +263,9 @@ export default function ShoppingListDetail() {
               </button>
 
               {nameError && (
-                <div style={{ color: "red", fontSize: 12, marginTop: 4 }}>{nameError}</div>
+                <div style={{ color: "red", fontSize: 12, marginTop: 4 }}>
+                  {nameError}
+                </div>
               )}
             </div>
           ) : (
@@ -201,7 +305,11 @@ export default function ShoppingListDetail() {
               onChange={(e) => setNewItemText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addItem()}
             />
-            <button className="btn primary" onClick={addItem} disabled={!newItemText.trim()}>
+            <button
+              className="btn primary"
+              onClick={addItem}
+              disabled={!newItemText.trim()}
+            >
               ＋
             </button>
           </div>
@@ -217,7 +325,10 @@ export default function ShoppingListDetail() {
                   />
                   <span className={it.completed ? "done" : ""}>{it.text}</span>
                 </label>
-                <button className="btn ghost danger" onClick={() => removeItem(it.id)}>
+                <button
+                  className="btn ghost danger"
+                  onClick={() => removeItem(it.id)}
+                >
                   ×
                 </button>
               </li>
@@ -264,7 +375,7 @@ export default function ShoppingListDetail() {
           )}
 
           <div className="subhead">
-            <span>Owner</span>
+            <span>Members</span>
           </div>
           <ul className="list members">
             {list.members.map((m) => (
@@ -274,7 +385,10 @@ export default function ShoppingListDetail() {
                   <div className="muted">{m.email}</div>
                 </div>
                 {isOwner && m.id !== list.ownerId && (
-                  <button className="btn ghost danger" onClick={() => removeMember(m.id)}>
+                  <button
+                    className="btn ghost danger"
+                    onClick={() => removeMember(m.id)}
+                  >
                     Remove
                   </button>
                 )}

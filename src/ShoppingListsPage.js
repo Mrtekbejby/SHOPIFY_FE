@@ -34,7 +34,7 @@ const SEED = [
     name: "Office snacks",
     archived: false,
     items: new Array(6).fill(null),
-    members: ["alex@gmail.com"],
+    members: ["alex@gmail.com","misa@gmail.com"],
     ownerId: "u2"
   },
   {
@@ -161,8 +161,8 @@ export default function ShoppingListsPage() {
 
   const openCreateModal = () => setModalOpen(true);
 
-  const openList = (id) => {
-    navigate(`/shopping-list/${id}`);
+  const openList = (list) => {
+    navigate(`/shopping-list/${list.id}`, { state: { list } });
   };
 
   const askDelete = (list) => {
@@ -203,7 +203,7 @@ export default function ShoppingListsPage() {
               name={l.name}
               itemCount={l.items.length}
               memberCount={l.members.length}
-              onClick={() => openList(l.id)}
+              onClick={() => openList(l)}
               canDelete={canDelete}
               onDelete={() => askDelete(l)}
             />
