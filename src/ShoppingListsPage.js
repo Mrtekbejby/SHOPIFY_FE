@@ -84,7 +84,19 @@ function StatBadge({ icon, value, label }) {
   );
 }
 
-function ListCard({ name, itemCount, memberCount, onClick, canDelete, onDelete }) {
+function ListCard({
+  name, 
+  itemCount,
+  memberCount,
+  archived,
+  onClick,
+  canDelete,
+  onDelete,
+  canArchive,
+  onArchive
+}) {
+  const archiveLabel = archived ? "unarchive" : "archive";
+
   return (
     <div
       className="listcard"
@@ -100,12 +112,29 @@ function ListCard({ name, itemCount, memberCount, onClick, canDelete, onDelete }
         <StatBadge icon="🧺" value={itemCount} label="items" />
         <StatBadge icon="👥" value={memberCount} label="members" />
 
+        {canArchive && (
+          <button
+            type="button"
+            className="badge"
+            onClick={(e) => {
+              e.stopPropagation();
+              onArchive();
+            }}
+            title={archiveLabel}
+          >
+            <span className="badge-icon" aria-hidden>
+              📥
+            </span>
+            <span className="badge-label">{archiveLabel}</span>
+          </button>
+        )}
+
         {canDelete && (
           <button
             type="button"
             className="badge badge-delete"
             onClick={(e) => {
-              e.stopPropagation(); 
+              e.stopPropagation();
               onDelete();
             }}
             title="Delete list"
@@ -155,7 +184,14 @@ export default function ShoppingListsPage() {
     if (!trimmed) return;
     setLists(prev => [
       ...prev,
-      { id: "l" + Date.now(), name: trimmed, archived: false, items: [], members: [], ownerId: CURRENT_USER_ID }
+      {
+        id: "l" + Date.now(),
+        name: trimmed,
+        archived: false,
+        items: [],
+        members: [],
+        ownerId: CURRENT_USER_ID
+      }
     ]);
   };
 
@@ -173,6 +209,18 @@ export default function ShoppingListsPage() {
     const ok = window.confirm(`Delete list "${list.name}"? This action cannot be undone.`);
     if (!ok) return;
     setLists(prev => prev.filter(l => l.id !== list.id));
+  };
+
+  const toggleArchive = (list) => {
+    if (list.ownerId !== CURRENT_USER_ID) {
+      alert("Only the owner can archive this list.");
+      return;
+    }
+    setLists(prev =>
+      prev.map(l =>
+        l.id === list.id ? { ...l, archived: !l.archived } : l
+      )
+    );
   };
 
   return (
@@ -196,16 +244,22 @@ export default function ShoppingListsPage() {
 
       <div className="listgrid">
         {visible.map(l => {
-          const canDelete = l.ownerId === CURRENT_USER_ID;
+          const isOwner = l.ownerId === CURRENT_USER_ID;
+          const canDelete = isOwner;
+          const canArchive = isOwner;
+
           return (
             <ListCard
               key={l.id}
               name={l.name}
               itemCount={l.items.length}
               memberCount={l.members.length}
+              archived={l.archived}
               onClick={() => openList(l)}
               canDelete={canDelete}
               onDelete={() => askDelete(l)}
+              canArchive={canArchive}
+              onArchive={() => toggleArchive(l)}
             />
           );
         })}
