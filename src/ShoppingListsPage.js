@@ -1,51 +1,14 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import CreateListModal from "./CreateListModal";
+import {
+  fetchLists,
+  createList,
+  archiveListApi,
+  deleteListApi
+} from "./api/listApi";
 
 const CURRENT_USER_ID = "u1";
-
-const SEED = [
-  {
-    id: "l1",
-    name: "Weekend shopping",
-    archived: true,
-    items: [],
-    members: ["lucas@gmail.com", "marie@gmail.com"],
-    ownerId: "u1"
-  },
-  {
-    id: "l2",
-    name: "Birthday party supplies",
-    archived: false,
-    items: [],
-    members: ["simon@gmail.com", "anna@gmail.com", "paul@gmail.com"],
-    ownerId: "u1"
-  },
-  {
-    id: "l3",
-    name: "Weekly groceries",
-    archived: false,
-    items: new Array(9).fill(null),
-    members: ["sofia@gmail.com", "emma@gmail.com", "john@gmail.com", "adam@gmail.com"],
-    ownerId: "u2"
-  },
-  {
-    id: "l4",
-    name: "Office snacks",
-    archived: false,
-    items: new Array(6).fill(null),
-    members: ["alex@gmail.com","misa@gmail.com"],
-    ownerId: "u2"
-  },
-  {
-    id: "l5",
-    name: "Camping trip food list",
-    archived: false,
-    items: new Array(3).fill(null),
-    members: ["peter@gmail.com", "nina@gmail.com", "maria@gmail.com", "tom@gmail.com", "sofia@gmail.com"],
-    ownerId: "u1"
-  }
-];
 
 function ShopifyWordmark() {
   return (
@@ -85,7 +48,7 @@ function StatBadge({ icon, value, label }) {
 }
 
 function ListCard({
-  name, 
+  name,
   itemCount,
   memberCount,
   archived,
@@ -95,8 +58,6 @@ function ListCard({
   canArchive,
   onArchive
 }) {
-  const archiveLabel = archived ? "unarchive" : "archive";
-
   return (
     <div
       className="listcard"
@@ -106,13 +67,16 @@ function ListCard({
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClick()}
       style={{ cursor: "pointer" }}
     >
-      <span className="listcard-name">{name}</span>
+      <span className="listcard-name">
+        {name}
+        {archived && <span className="badge archived-badge">Archived</span>}
+      </span>
 
       <span className="listcard-stats">
         <StatBadge icon="🧺" value={itemCount} label="items" />
         <StatBadge icon="👥" value={memberCount} label="members" />
 
-        {canArchive && (
+        {canArchive && !archived && (
           <button
             type="button"
             className="badge"
@@ -120,12 +84,10 @@ function ListCard({
               e.stopPropagation();
               onArchive();
             }}
-            title={archiveLabel}
+            title="Archive list"
           >
-            <span className="badge-icon" aria-hidden>
-              📥
-            </span>
-            <span className="badge-label">{archiveLabel}</span>
+            <span className="badge-icon" aria-hidden>📦</span>
+            <span className="badge-label">archive</span>
           </button>
         )}
 
@@ -139,9 +101,7 @@ function ListCard({
             }}
             title="Delete list"
           >
-            <span className="badge-icon" aria-hidden>
-              🗑️
-            </span>
+            <span className="badge-icon" aria-hidden>🗑️</span>
             <span className="badge-label">delete</span>
           </button>
         )}
@@ -161,66 +121,92 @@ function Toolbar({ showArchived, onToggleArchived, onNew }) {
         />
         <span>Show archived</span>
       </label>
-
-      <button className="btn primary" onClick={onNew}>＋ New List</button>
-    </div>
+        <button className="btn primary" onClick={onNew}>
+          ＋ New List
+        </button>
+      </div>
   );
 }
 
 export default function ShoppingListsPage() {
   const navigate = useNavigate();
 
-  const [lists, setLists] = useState(SEED);
+  const [lists, setLists] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+  const loadLists = async () => {
+    setStatus("loading");
+    setError("");
+    try {
+      const data = await fetchLists();
+      setLists(data);
+      setStatus("ready");
+    } catch (e) {
+      setError(e.message || "Failed to load lists");
+      setStatus("error");
+    }
+  };
+
+  useEffect(() => {
+    loadLists();
+  }, []);
 
   const visible = useMemo(
-    () => lists.filter(l => (showArchived ? true : !l.archived)),
+    () => lists.filter((l) => (showArchived ? true : !l.archived)),
     [lists, showArchived]
   );
 
-  const addList = (name) => {
+  const handleCreateList = async (name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setLists(prev => [
-      ...prev,
-      {
-        id: "l" + Date.now(),
-        name: trimmed,
-        archived: false,
-        items: [],
-        members: [],
-        ownerId: CURRENT_USER_ID
-      }
-    ]);
+    try {
+      const created = await createList(trimmed);
+      setLists((prev) => [...prev, created]);
+    } catch (e) {
+      alert(e.message || "Failed to create list");
+    }
   };
 
   const openCreateModal = () => setModalOpen(true);
 
   const openList = (list) => {
-    navigate(`/shopping-list/${list.id}`, { state: { list } });
+    navigate(`/shopping-list/${list.id}`);
   };
 
-  const askDelete = (list) => {
+  const askDelete = async (list) => {
     if (list.ownerId !== CURRENT_USER_ID) {
       alert("Only the owner can delete this list.");
       return;
     }
     const ok = window.confirm(`Delete list "${list.name}"? This action cannot be undone.`);
     if (!ok) return;
-    setLists(prev => prev.filter(l => l.id !== list.id));
+
+    try {
+      await deleteListApi(list.id);
+      setLists(prev => prev.filter((l) => l.id !== list.id));
+    } catch (e) {
+      alert(e.message || "Failed to delete list");
+    }
   };
 
-  const toggleArchive = (list) => {
+  const archiveList = async (list) => {
     if (list.ownerId !== CURRENT_USER_ID) {
       alert("Only the owner can archive this list.");
       return;
     }
-    setLists(prev =>
-      prev.map(l =>
-        l.id === list.id ? { ...l, archived: !l.archived } : l
-      )
-    );
+
+    try {
+      const updated = await archiveListApi(list.id);
+      setLists(prev =>
+        prev.map((l) =>
+          l.id === list.id ? { ...l, archived: updated.archived } : l
+        )
+      );
+    } catch (e) {
+      alert(e.message || "Failed to archive list");
+    }
   };
 
   return (
@@ -230,7 +216,9 @@ export default function ShoppingListsPage() {
         <div className="spacer" />
         <button
           className="btn ghost"
-          onClick={() => { alert("Signed out successfully! (demo only)"); }}
+          onClick={() => {
+            alert("Signed out successfully! (demo only)");
+          }}
         >
           ⎋ Sign Out
         </button>
@@ -242,12 +230,19 @@ export default function ShoppingListsPage() {
         onNew={openCreateModal}
       />
 
-      <div className="listgrid">
-        {visible.map(l => {
-          const isOwner = l.ownerId === CURRENT_USER_ID;
-          const canDelete = isOwner;
-          const canArchive = isOwner;
+      {status === "loading" && (
+        <div className="info-banner">Loading lists…</div>
+      )}
 
+      {status === "error" && (
+        <div className="error-banner">
+          {error || "Something went wrong while loading lists."}
+        </div>
+      )}
+
+      <div className="listgrid">
+        {visible.map((l) => {
+          const isOwner = l.ownerId === CURRENT_USER_ID;
           return (
             <ListCard
               key={l.id}
@@ -256,10 +251,10 @@ export default function ShoppingListsPage() {
               memberCount={l.members.length}
               archived={l.archived}
               onClick={() => openList(l)}
-              canDelete={canDelete}
+              canDelete={isOwner}
               onDelete={() => askDelete(l)}
-              canArchive={canArchive}
-              onArchive={() => toggleArchive(l)}
+              canArchive={isOwner}
+              onArchive={() => archiveList(l)}
             />
           );
         })}
@@ -268,7 +263,7 @@ export default function ShoppingListsPage() {
       {modalOpen && (
         <CreateListModal
           onClose={() => setModalOpen(false)}
-          onCreate={addList}
+          onCreate={handleCreateList}
         />
       )}
     </div>

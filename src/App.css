@@ -268,6 +268,25 @@ body{
   margin-left:2px;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rename-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.link {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
 /* Toolbar */
 .lists-toolbar{
   display:flex;
@@ -347,6 +366,17 @@ body{
 .badge-delete .badge-value,
 .badge-delete .badge-label{
   color: var(--danger);
+}
+
+.archived-badge {
+  background: #fff4e6;
+  color: #d97706;
+  border: 1px solid #facc15;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  margin-left: 8px;
+  font-weight: 600;
 }
 
 @media (max-width:480px){
@@ -430,3 +460,36 @@ body{
   margin-top:6px; display:flex; justify-content:flex-end; gap:12px;
 }
 .btn.lg{ height:48px; padding:0 22px; border-radius:12px; font-size:16px; }
+
+/* Alert */
+.alert-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.alert-card {
+  background: var(--card);
+  padding: 20px 24px;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+}
+
+.alert-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.alert-message {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--muted);
+}
