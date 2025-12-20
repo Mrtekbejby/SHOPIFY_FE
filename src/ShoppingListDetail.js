@@ -4,24 +4,27 @@ import { useNavigate, useParams } from "react-router-dom";
 import { addItemApi, toggleItemApi, deleteItemApi } from "./api/itemApi";
 import { addMemberApi, removeMemberApi } from "./api/memberApi";
 import { fetchLists, renameListApi } from "./api/listApi";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
+const PIE_COLORS = ["#22c55e", "#ef4444"];
 const CURRENT_USER_ID = "u1";
-const CURRENT_USER_EMAIL = "lucas@gmail.com"; 
-function AlertModal({ message, onClose }) {
+const CURRENT_USER_EMAIL = "lucas@gmail.com";
+
+function AlertModal({ message, onClose, t }) {
   return (
     <div className="alert-overlay">
       <div className="alert-card">
-        <h3 className="alert-title">Oops…</h3>
+        <h3 className="alert-title">{t("oops")}</h3>
         <p className="alert-message">{message}</p>
         <button className="btn primary" onClick={onClose}>
-          OK
+          {t("ok")}
         </button>
       </div>
     </div>
   );
 }
 
-export default function ShoppingListDetail() {
+export default function ShoppingListDetail({ theme, onToggleTheme, lang, setLang, t }) {
   const navigate = useNavigate();
   const { listId } = useParams();
 
@@ -51,7 +54,7 @@ export default function ShoppingListDetail() {
 
   useEffect(() => {
     loadList();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listId]);
 
   // RENAME
@@ -62,12 +65,12 @@ export default function ShoppingListDetail() {
 
   const saveRename = async () => {
     const trimmed = tempName.trim();
-  
+
     if (!trimmed) {
-      setAlertMessage("List name cannot be empty.");
+      setAlertMessage(t("renameEmpty"));
       return;
     }
-  
+
     try {
       setLoadingAction(true);
       const allLists = await fetchLists();
@@ -76,18 +79,18 @@ export default function ShoppingListDetail() {
           l.id !== list.id &&
           l.name.toLowerCase() === trimmed.toLowerCase()
       );
-  
+
       if (exists) {
-        setAlertMessage("A list with this name already exists.");
+        setAlertMessage(t("renameDuplicate"));
         setLoadingAction(false);
         return;
       }
-  
+
       const updated = await renameListApi(list.id, trimmed);
       setList(updated);
       setEditingName(false);
     } catch {
-      setAlertMessage("Failed to rename list. Please try again.");
+      setAlertMessage(t("renameFailed"));
     } finally {
       setLoadingAction(false);
     }
@@ -100,6 +103,17 @@ export default function ShoppingListDetail() {
     return [...items].sort((a, b) => Number(a.completed) - Number(b.completed));
   }, [list, showResolved]);
 
+  const stats = useMemo(() => {
+    const items = list?.items ?? [];
+    const done = items.filter((i) => i.completed).length;
+    const todo = items.length - done;
+
+    return [
+      { name: t("done"), value: done },
+      { name: t("toBuy"), value: todo }
+    ];
+  }, [list, t]);
+
   const goBack = () => navigate("/shopping-lists");
 
   const addItem = async () => {
@@ -111,7 +125,7 @@ export default function ShoppingListDetail() {
       await loadList();
       setNewItemText("");
     } catch {
-      alert("Failed to add item");
+      alert(t("failedAddItem"));
     } finally {
       setLoadingAction(false);
     }
@@ -123,7 +137,7 @@ export default function ShoppingListDetail() {
       setList(await toggleItemApi(list.id, id));
       await loadList();
     } catch {
-      alert("Failed to update item");
+      alert(t("failedUpdateItem"));
     } finally {
       setLoadingAction(false);
     }
@@ -135,7 +149,7 @@ export default function ShoppingListDetail() {
       setList(await deleteItemApi(list.id, id));
       await loadList();
     } catch {
-      alert("Failed to delete item");
+      alert(t("failedDeleteItem"));
     } finally {
       setLoadingAction(false);
     }
@@ -150,7 +164,7 @@ export default function ShoppingListDetail() {
       await loadList();
       setNewMemberEmail("");
     } catch {
-      alert("Failed to add member");
+      alert(t("failedAddMember"));
     } finally {
       setLoadingAction(false);
     }
@@ -162,7 +176,7 @@ export default function ShoppingListDetail() {
       setList(await removeMemberApi(list.id, memberId));
       await loadList();
     } catch {
-      alert("Failed to remove member");
+      alert(t("failedRemoveMember"));
     } finally {
       setLoadingAction(false);
     }
@@ -173,51 +187,67 @@ export default function ShoppingListDetail() {
     if (me) await removeMember(me.id);
   };
 
-  if (status === "loading") return <div className="page">Loading...</div>;
-  if (status === "error" || !list) return <div className="page">List not found</div>;
+  if (status === "loading") return <div className="page">{t("loading")}</div>;
+  if (status === "error" || !list) return <div className="page">{t("listNotFound")}</div>;
 
   return (
     <div className="page">
-     <header className="topbar">
-  <button className="back" onClick={goBack}>← Back</button>
+      <header className="topbar">
+        <button className="back" onClick={goBack}>← {t("back")}</button>
 
-  {!editingName ? (
-    <div className="title-row">
-      <h2 className="title">{list.name}</h2>
-      {isOwner && (
-        <button className="link" onClick={startRename} title="Rename list">
-          ✎
-        </button>
-      )}
-    </div>
-  ) : (
-    <div className="rename-row">
-      <input
-        className="input"
-        value={tempName}
-        onChange={(e) => setTempName(e.target.value)}
-      />
-      <button className="btn primary" onClick={saveRename}>Save</button>
-      <button className="btn ghost" onClick={() => setEditingName(false)}>Cancel</button>
-    </div>
-  )}
-</header>
+        {!editingName ? (
+          <div className="title-row">
+            <h2 className="title">{list.name}</h2>
+            {isOwner && (
+              <button className="link" onClick={startRename} title={t("renameTooltip")}>
+                ✎
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="rename-row">
+            <input
+              className="input"
+              value={tempName}
+              onChange={(e) => setTempName(e.target.value)}
+            />
+            <button className="btn primary" onClick={saveRename}>{t("save")}</button>
+            <button className="btn ghost" onClick={() => setEditingName(false)}>{t("cancel")}</button>
+          </div>
+        )}
+
+        <div className="detail-actions">
+          <button className="badge theme-toggle" onClick={onToggleTheme} title={t("toggleTheme")}>
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+
+          <button
+            className="badge badge-lang"
+            onClick={() => setLang(lang === "en" ? "cs" : "en")}
+            title={t("changeLang")}
+          >
+            <span className="flag" aria-hidden>{lang === "en" ? "🇬🇧" : "🇨🇿"}</span>
+            <span className="code">{lang === "en" ? "EN" : "CS"}</span>
+          </button>
+        </div>
+
+      </header>
 
       <main className="grid">
 
         {/* ITEMS */}
         <section className="card">
           <div className="card-header">
-            <h3 className="card-title">Items</h3>
+            <h3 className="card-title">{t("itemsTitle")}</h3>
             <label className="switch-wrap">
               <input type="checkbox" checked={showResolved} onChange={() => setShowResolved((v) => !v)} />
-              <span>Show resolved</span>
+              <span>{t("showResolved")}</span>
             </label>
           </div>
 
           <div className="add-row">
             <input className="input"
-              placeholder="Add item..."
+              placeholder={t("addItemPlaceholder")}
               value={newItemText}
               onChange={(e) => setNewItemText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addItem()}
@@ -241,13 +271,13 @@ export default function ShoppingListDetail() {
         {/* MEMBERS */}
         <section className="card">
           <div className="card-header">
-            <h3 className="card-title">Members</h3>
+            <h3 className="card-title">{t("membersTitle")}</h3>
           </div>
 
           <div className="add-row">
             <input type="email"
               className="input"
-              placeholder="Add member (email@example.com)"
+              placeholder={t("addMemberPlaceholder")}
               value={newMemberEmail}
               onChange={(e) => setNewMemberEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addMember()}
@@ -264,21 +294,59 @@ export default function ShoppingListDetail() {
                   <div className="muted">{m.email}</div>
                 </div>
                 {isOwner && m.id !== list.ownerId && (
-                  <button className="btn ghost danger" onClick={() => removeMember(m.id)}>Remove</button>
+                  <button className="btn ghost danger" onClick={() => removeMember(m.id)}>{t("remove")}</button>
                 )}
               </li>
             ))}
           </ul>
 
           {!isOwner && (
-            <button className="btn ghost danger" onClick={leaveList}>Leave list</button>
+            <button className="btn ghost danger" onClick={leaveList}>{t("leaveList")}</button>
           )}
         </section>
+
+        {/* STATS */}
+        <section className="card">
+          <div className="card-header">
+            <h3 className="card-title">{t("statsTitle")}</h3>
+          </div>
+
+          <div style={{ width: "100%", height: 220 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie
+                  data={stats}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={0}
+                >
+                  {stats.map((_, index) => (
+                    <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+            <span style={{ color: PIE_COLORS[0] }}>
+              ● {t("done")}: {stats[0].value}
+            </span>
+            <span style={{ color: PIE_COLORS[1] }}>
+              ● {t("toBuy")}: {stats[1].value}
+            </span>
+          </div>
+        </section>
+
       </main>
       {alertMessage && (
         <AlertModal
           message={alertMessage}
           onClose={() => setAlertMessage("")}
+          t={t}
         />
       )}
 

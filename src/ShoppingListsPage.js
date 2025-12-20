@@ -7,8 +7,17 @@ import {
   archiveListApi,
   deleteListApi
 } from "./api/listApi";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts";
 
 const CURRENT_USER_ID = "u1";
+const BAR_COLOR = "#3b82f6";
 
 function ShopifyWordmark() {
   return (
@@ -56,7 +65,8 @@ function ListCard({
   canDelete,
   onDelete,
   canArchive,
-  onArchive
+  onArchive,
+  t
 }) {
   return (
     <div
@@ -69,12 +79,12 @@ function ListCard({
     >
       <span className="listcard-name">
         {name}
-        {archived && <span className="badge archived-badge">Archived</span>}
+        {archived && <span className="badge archived-badge">{t("archived")}</span>}
       </span>
 
       <span className="listcard-stats">
-        <StatBadge icon="🧺" value={itemCount} label="items" />
-        <StatBadge icon="👥" value={memberCount} label="members" />
+        <StatBadge icon="🧺" value={itemCount} label={t("items")} />
+        <StatBadge icon="👥" value={memberCount} label={t("members")} />
 
         {canArchive && !archived && (
           <button
@@ -84,10 +94,10 @@ function ListCard({
               e.stopPropagation();
               onArchive();
             }}
-            title="Archive list"
+            title={t("archive")}
           >
             <span className="badge-icon" aria-hidden>📦</span>
-            <span className="badge-label">archive</span>
+            <span className="badge-label">{t("archive")}</span>
           </button>
         )}
 
@@ -99,10 +109,10 @@ function ListCard({
               e.stopPropagation();
               onDelete();
             }}
-            title="Delete list"
+            title={t("delete")}
           >
             <span className="badge-icon" aria-hidden>🗑️</span>
-            <span className="badge-label">delete</span>
+            <span className="badge-label">{t("delete")}</span>
           </button>
         )}
       </span>
@@ -110,7 +120,7 @@ function ListCard({
   );
 }
 
-function Toolbar({ showArchived, onToggleArchived, onNew }) {
+function Toolbar({ showArchived, onToggleArchived, onNew, t }) {
   return (
     <div className="lists-toolbar">
       <label className="switch-wrap">
@@ -119,16 +129,16 @@ function Toolbar({ showArchived, onToggleArchived, onNew }) {
           checked={showArchived}
           onChange={() => onToggleArchived(v => !v)}
         />
-        <span>Show archived</span>
+        <span>{t("showArchived")}</span>
       </label>
-        <button className="btn primary" onClick={onNew}>
-          ＋ New List
-        </button>
-      </div>
+      <button className="btn primary" onClick={onNew}>
+        ＋ {t("newList")}
+      </button>
+    </div>
   );
 }
 
-export default function ShoppingListsPage() {
+export default function ShoppingListsPage({ theme, onToggleTheme, lang, setLang, t }) {
   const navigate = useNavigate();
 
   const [lists, setLists] = useState([]);
@@ -144,7 +154,7 @@ export default function ShoppingListsPage() {
       setLists(data);
       setStatus("ready");
     } catch (e) {
-      setError(e.message || "Failed to load lists");
+      setError(e.message || t("loadError"));
       setStatus("error");
     }
   };
@@ -158,18 +168,23 @@ export default function ShoppingListsPage() {
     [lists, showArchived]
   );
 
+  const chartData = useMemo(() => {
+    return visible.map((l) => ({
+      name: l.name,
+      items: l.items.length
+    }));
+  }, [visible]);
+
   const handleCreateList = async (name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     try {
       const created = await createList(trimmed);
       setLists((prev) => [...prev, created]);
-    } catch (e) {
-      alert(e.message || "Failed to create list");
+    } catch {
+      alert(t("failedCreate"));
     }
   };
-
-  const openCreateModal = () => setModalOpen(true);
 
   const openList = (list) => {
     navigate(`/shopping-list/${list.id}`);
@@ -177,23 +192,23 @@ export default function ShoppingListsPage() {
 
   const askDelete = async (list) => {
     if (list.ownerId !== CURRENT_USER_ID) {
-      alert("Only the owner can delete this list.");
+      alert(t("onlyOwnerDelete"));
       return;
     }
-    const ok = window.confirm(`Delete list "${list.name}"? This action cannot be undone.`);
+    const ok = window.confirm(t("deleteConfirm", { name: list.name }));
     if (!ok) return;
 
     try {
       await deleteListApi(list.id);
       setLists(prev => prev.filter((l) => l.id !== list.id));
-    } catch (e) {
-      alert(e.message || "Failed to delete list");
+    } catch {
+      alert(t("failedDelete"));
     }
   };
 
   const archiveList = async (list) => {
     if (list.ownerId !== CURRENT_USER_ID) {
-      alert("Only the owner can archive this list.");
+      alert(t("onlyOwnerArchive"));
       return;
     }
 
@@ -204,8 +219,8 @@ export default function ShoppingListsPage() {
           l.id === list.id ? { ...l, archived: updated.archived } : l
         )
       );
-    } catch (e) {
-      alert(e.message || "Failed to archive list");
+    } catch {
+      alert(t("failedArchive"));
     }
   };
 
@@ -213,30 +228,47 @@ export default function ShoppingListsPage() {
     <div className="page">
       <header className="lists-header">
         <ShopifyWordmark />
-        <div className="spacer" />
-        <button
-          className="btn ghost"
-          onClick={() => {
-            alert("Signed out successfully! (demo only)");
-          }}
-        >
-          ⎋ Sign Out
-        </button>
+        <div className="header-actions">
+          <button
+            className="badge badge-theme"
+            onClick={onToggleTheme}
+            title="Toggle theme"
+          >
+            {theme === "light" ? "🌙" : "☀️"}
+          </button>
+
+          <button
+            className="badge"
+            onClick={() => setLang(lang === "en" ? "cs" : "en")}
+            title="Toggle language"
+          >
+            {lang === "en" ? "🇨🇿 CZ" : "🇬🇧 EN"}
+          </button>
+
+          <button
+            className="badge badge-signout"
+            onClick={() => alert("Signed out successfully! (demo only)")}
+            title={t("signOut")}
+          >
+            ⎋ {t("signOut")}
+          </button>
+        </div>
       </header>
 
       <Toolbar
         showArchived={showArchived}
         onToggleArchived={setShowArchived}
-        onNew={openCreateModal}
+        onNew={() => setModalOpen(true)}
+        t={t}
       />
 
       {status === "loading" && (
-        <div className="info-banner">Loading lists…</div>
+        <div className="info-banner">{t("loadingLists")}</div>
       )}
 
       {status === "error" && (
         <div className="error-banner">
-          {error || "Something went wrong while loading lists."}
+          {error || t("loadError")}
         </div>
       )}
 
@@ -255,10 +287,30 @@ export default function ShoppingListsPage() {
               onDelete={() => askDelete(l)}
               canArchive={isOwner}
               onArchive={() => archiveList(l)}
+              t={t}
             />
           );
         })}
       </div>
+
+      {chartData.length > 0 && (
+        <section className="card" style={{ marginTop: 24 }}>
+          <div className="card-header">
+            <h3 className="card-title">{t("listsOverview")}</h3>
+          </div>
+
+          <div style={{ width: "100%", height: 260 }}>
+            <ResponsiveContainer>
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip cursor={false} wrapperStyle={{ outline: "none" }} />
+                <Bar dataKey="items" fill={BAR_COLOR} radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
 
       {modalOpen && (
         <CreateListModal
